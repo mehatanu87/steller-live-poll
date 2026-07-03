@@ -97,8 +97,21 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
 
+      - name: Cache Cargo registry and bins
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.cargo/bin
+          key: ${{ runner.os }}-cargo-stellar-cli-${{ hashFiles('**/Cargo.toml') }}
+          restore-keys: ${{ runner.os }}-cargo-stellar-cli-
+
       - name: Install Stellar CLI
-        run: cargo install --locked stellar-cli
+        run: |
+          if ! command -v stellar &> /dev/null; then
+            cargo install --locked stellar-cli
+          fi
 
       - name: Download WASM
         uses: actions/download-artifact@v4
