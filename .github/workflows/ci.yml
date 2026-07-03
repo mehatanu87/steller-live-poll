@@ -1,0 +1,156 @@
+name: StellarVault CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # ── Smart Contract Tests ─────────────────────────────────────────────────────
+  contract-test:
+    name: Contract Tests (Soroban)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Run contract tests
+        run: cargo test --workspace --verbose
+
+      - name: Build WASM release
+        run: cargo build --target wasm32-unknown-unknown --release --workspace
+
+      - name: Upload WASM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: stellar-vault-wasm
+          path: target/wasm32-unknown-unknown/release/stellar_vault.wasm
+
+  # ── Frontend Tests ───────────────────────────────────────────────────────────
+  frontend-test:
+    name: Frontend Tests (Vitest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint --if-present
+
+      - name: Run tests
+        run: npm run test:run
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_NETWORK: testnet
+          VITE_CONTRACT_ID: ${{ secrets.CONTRACT_ID || 'CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM' }}
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/dist
+
+  # ── Deploy to Testnet ────────────────────────────────────────────────────────
+  deploy-contract:
+    name: Deploy Contract (Testnet)
+    needs: contract-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install Stellar CLI
+        run: |
+          curl -L https://github.com/stellar/stellar-cli/releases/latest/download/stellar-cli-x86_64-unknown-linux-gnu.tar.gz | tar xz
+          sudo mv stellar /usr/local/bin/
+
+      - name: Download WASM
+        uses: actions/download-artifact@v4
+        with:
+          name: stellar-vault-wasm
+
+      - name: Fund deployer account
+        run: |
+          stellar keys generate --global deployer --network testnet
+          stellar keys fund --global deployer --network testnet
+
+      - name: Deploy contract
+        run: |
+          CONTRACT_ID=$(stellar contract deploy \
+            --wasm stellar_vault.wasm \
+            --source deployer \
+            --network testnet)
+          echo "CONTRACT_ID=$CONTRACT_ID" >> $GITHUB_ENV
+          echo "Deployed contract: $CONTRACT_ID"
+
+      - name: Initialize contract
+        run: |
+          stellar contract invoke \
+            --id $CONTRACT_ID \
+            --source deployer \
+            --network testnet \
+            -- initialize \
+            --admin $(stellar keys address deployer) \
+            --reward_rate 10
+
+  # ── Deploy Frontend ──────────────────────────────────────────────────────────
+  deploy-frontend:
+    name: Deploy Frontend (Vercel)
+    needs: [frontend-test, deploy-contract]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download frontend build
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/dist
+
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: ./frontend
+          vercel-args: '--prod'
