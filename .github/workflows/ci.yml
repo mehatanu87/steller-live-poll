@@ -36,15 +36,6 @@ jobs:
       - name: Run contract tests
         run: cargo test --workspace --verbose
 
-      - name: Build WASM release
-        run: cargo build --target wasm32-unknown-unknown --release --workspace
-
-      - name: Upload WASM artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: stellar-vault-wasm
-          path: target/wasm32-unknown-unknown/release/stellar_vault.wasm
-
   # ── Frontend Tests ───────────────────────────────────────────────────────────
   frontend-test:
     name: Frontend Tests (Vitest)
@@ -116,10 +107,8 @@ jobs:
             cargo install --locked stellar-cli
           fi
 
-      - name: Download WASM
-        uses: actions/download-artifact@v4
-        with:
-          name: stellar-vault-wasm
+      - name: Build Contract WASM
+        run: stellar contract build
 
       - name: Fund deployer account
         run: |
@@ -128,8 +117,12 @@ jobs:
 
       - name: Deploy contract
         run: |
+          WASM_PATH=$(find target/wasm32-unknown-unknown/release -name "*.optimized.wasm" | head -n 1)
+          if [ -z "$WASM_PATH" ]; then
+            WASM_PATH="target/wasm32-unknown-unknown/release/stellar_vault.wasm"
+          fi
           CONTRACT_ID=$(stellar contract deploy \
-            --wasm stellar_vault.wasm \
+            --wasm $WASM_PATH \
             --source deployer \
             --network testnet)
           echo "CONTRACT_ID=$CONTRACT_ID" >> $GITHUB_ENV
