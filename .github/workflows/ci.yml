@@ -123,8 +123,8 @@ jobs:
 
       - name: Fund deployer account
         run: |
-          stellar keys generate --global deployer --network testnet
-          stellar keys fund --global deployer --network testnet
+          stellar keys generate deployer --network testnet
+          stellar keys fund deployer --network testnet
 
       - name: Deploy contract
         run: |
