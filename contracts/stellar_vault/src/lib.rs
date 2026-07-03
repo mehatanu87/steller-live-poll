@@ -1,8 +1,8 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, contractevent,
-    Address, Env, Symbol, Vec, Map, String,
+    contract, contractimpl, contracttype,
+    Address, Env, String,
     symbol_short, log,
 };
 
@@ -61,7 +61,7 @@ pub struct Proposal {
 
 // ─── Events ───────────────────────────────────────────────────────────────────
 
-#[contractevent]
+#[contracttype]
 pub struct DepositEvent {
     pub user: Address,
     pub amount: i128,
@@ -69,7 +69,7 @@ pub struct DepositEvent {
     pub timestamp: u64,
 }
 
-#[contractevent]
+#[contracttype]
 pub struct WithdrawEvent {
     pub user: Address,
     pub amount: i128,
@@ -77,21 +77,21 @@ pub struct WithdrawEvent {
     pub timestamp: u64,
 }
 
-#[contractevent]
+#[contracttype]
 pub struct RewardClaimedEvent {
     pub user: Address,
     pub reward_amount: i128,
     pub timestamp: u64,
 }
 
-#[contractevent]
+#[contracttype]
 pub struct ProposalCreatedEvent {
     pub proposal_id: u64,
     pub proposer: Address,
     pub title: String,
 }
 
-#[contractevent]
+#[contracttype]
 pub struct VoteCastEvent {
     pub proposal_id: u64,
     pub voter: Address,
@@ -602,7 +602,7 @@ mod tests {
 
     #[test]
     fn test_initialize() {
-        let (env, admin, client) = setup_env();
+        let (_env, admin, client) = setup_env();
         let stats = client.get_vault_stats();
         assert!(stats.vault_open);
         assert_eq!(stats.total_deposited, 0);
@@ -670,38 +670,29 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
     fn test_vault_closed_prevents_deposit() {
         let (env, admin, client) = setup_env();
         let user = Address::generate(&env);
 
         client.set_vault_open(&admin, &false);
-        let result = std::panic::catch_unwind(|| {
-            client.deposit(&user, &100_000_i128);
-        });
-        // Expect panic because vault is closed
-        assert!(result.is_err());
+        client.deposit(&user, &100_000_i128);
     }
 
     #[test]
+    #[should_panic]
     fn test_cannot_withdraw_more_than_balance() {
         let (env, _admin, client) = setup_env();
         let user = Address::generate(&env);
         client.deposit(&user, &100_000_i128);
-
-        let result = std::panic::catch_unwind(|| {
-            client.withdraw(&user, &999_999_i128);
-        });
-        assert!(result.is_err());
+        client.withdraw(&user, &999_999_i128);
     }
 
     #[test]
+    #[should_panic]
     fn test_non_admin_cannot_close_vault() {
         let (env, _admin, client) = setup_env();
         let attacker = Address::generate(&env);
-
-        let result = std::panic::catch_unwind(|| {
-            client.set_vault_open(&attacker, &false);
-        });
-        assert!(result.is_err());
+        client.set_vault_open(&attacker, &false);
     }
 }
