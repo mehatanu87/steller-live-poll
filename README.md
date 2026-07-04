@@ -1,15 +1,4 @@
 # StellarVault ⬡
-
-> **Level 3 – Orange Belt Submission**  
-> Production-grade XLM staking & governance dApp built on **Stellar Soroban**
-
-[![CI/CD](https://github.com/mehatanu87/steller-live-poll/actions/workflows/ci.yml/badge.svg)](https://github.com/mehatanu87/steller-live-poll/actions)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Testnet](https://img.shields.io/badge/Network-Stellar%20Testnet-orange)]()
-[![Commits](https://img.shields.io/badge/Commits-37%2B-green)]()
-
----
-
 ## 🌐 Live Links
 
 | Resource | Link |
@@ -21,24 +10,6 @@
 | **Demo Video** | https://drive.google.com/file/d/1hLldHjdqzWlXSTjrroFL0gkVigf5LCpy/view?usp=sharing |
 
 ---
-
-## 📋 Submission Checklist
-
-| Requirement | Status |
-|---|---|
-| ✅ Public GitHub repository | [github.com/mehatanu87/steller-live-poll](https://github.com/mehatanu87/steller-live-poll) |
-| ✅ README with complete documentation | This file |
-| ✅ Minimum 10+ meaningful commits | **37 commits** |
-| ✅ Live demo link | https://steller-live-poll.vercel.app |
-| ✅ Contract deployment address | `CBLBZWNHE26XAVUK6SRWFBCGKSRNEWPFGRHYTLXPKKSZO2VEQVN2PLYP` |
-| ✅ Transaction hash for contract interaction | See [Transaction Hashes](#transaction-hashes) section |
-| ✅ Mobile responsive UI screenshot | See [Screenshots](#screenshots) section |
-| ✅ CI/CD pipeline running | GitHub Actions — contract tests → build → deploy |
-| ✅ Test output with 3+ passing tests | 7 contract tests + 36 frontend tests |
-| ✅ Demo video (1–2 min) | https://drive.google.com/file/d/1hLldHjdqzWlXSTjrroFL0gkVigf5LCpy/view?usp=sharing |
-
----
-
 ## 📸 Screenshots
 
 ### 1. Mobile Responsive UI
@@ -139,6 +110,22 @@ Every push to `main` triggers 4 jobs automatically:
 2. **Frontend Tests** (Vitest)
 3. **Deploy Contract** (Builds WASM & deploys to Stellar Testnet)
 4. **Deploy Frontend** (Deploys to Vercel with the newly generated `CONTRACT_ID`)
+
+---
+## 📋 Submission Checklist
+
+| Requirement | Status |
+|---|---|
+| ✅ Public GitHub repository | [github.com/mehatanu87/steller-live-poll](https://github.com/mehatanu87/steller-live-poll) |
+| ✅ README with complete documentation | This file |
+| ✅ Minimum 10+ meaningful commits | **37 commits** |
+| ✅ Live demo link | https://steller-live-poll.vercel.app |
+| ✅ Contract deployment address | `CBLBZWNHE26XAVUK6SRWFBCGKSRNEWPFGRHYTLXPKKSZO2VEQVN2PLYP` |
+| ✅ Transaction hash for contract interaction | See [Transaction Hashes](#transaction-hashes) section |
+| ✅ Mobile responsive UI screenshot | See [Screenshots](#screenshots) section |
+| ✅ CI/CD pipeline running | GitHub Actions — contract tests → build → deploy |
+| ✅ Test output with 3+ passing tests | 7 contract tests + 36 frontend tests |
+| ✅ Demo video (1–2 min) | https://drive.google.com/file/d/1hLldHjdqzWlXSTjrroFL0gkVigf5LCpy/view?usp=sharing |
 
 ---
 
