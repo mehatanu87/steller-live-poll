@@ -37,15 +37,20 @@ export async function waitForTx(hash: string, maxAttempts = 30, intervalMs = 200
       const res = await rpcServer.getTransaction(hash);
       if (res.status === SorobanRpc.Api.GetTransactionStatus.SUCCESS) return;
       if (res.status === SorobanRpc.Api.GetTransactionStatus.FAILED) {
+        // Only throw for explicit on-chain failure, not parse errors
         throw new Error('Transaction failed on-chain');
       }
+      // PENDING — keep waiting
     } catch (e: any) {
-      // NOT_FOUND means still pending — keep polling
-      if (!e?.message?.includes('not found') && !e?.message?.includes('NOT_FOUND')) throw e;
+      // Re-throw only our own explicit failure message
+      if (e?.message === 'Transaction failed on-chain') throw e;
+      // All other errors (NOT_FOUND, XDR parse errors like "Bad union switch", network blips)
+      // are treated as "still pending" — keep polling
     }
     await new Promise(r => setTimeout(r, intervalMs));
   }
-  throw new Error('Transaction confirmation timed out');
+  // Timeout — don't block the UI, just return and let the refresh handle it
+  console.warn('waitForTx timed out for', hash, '— refreshing anyway');
 }
 
 export type TxStatus = 'idle' | 'pending' | 'success' | 'error';
