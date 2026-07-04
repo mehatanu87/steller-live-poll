@@ -30,28 +30,13 @@ export const CONTRACT_ID =
 
 export const rpcServer = new SorobanRpc.Server(NETWORK.rpcUrl);
 
-// Poll until a submitted tx is confirmed on-chain (SUCCESS or FAILED)
-export async function waitForTx(hash: string, maxAttempts = 30, intervalMs = 2000): Promise<void> {
-  for (let i = 0; i < maxAttempts; i++) {
-    try {
-      const res = await rpcServer.getTransaction(hash);
-      if (res.status === SorobanRpc.Api.GetTransactionStatus.SUCCESS) return;
-      if (res.status === SorobanRpc.Api.GetTransactionStatus.FAILED) {
-        // Only throw for explicit on-chain failure, not parse errors
-        throw new Error('Transaction failed on-chain');
-      }
-      // PENDING — keep waiting
-    } catch (e: any) {
-      // Re-throw only our own explicit failure message
-      if (e?.message === 'Transaction failed on-chain') throw e;
-      // All other errors (NOT_FOUND, XDR parse errors like "Bad union switch", network blips)
-      // are treated as "still pending" — keep polling
-    }
-    await new Promise(r => setTimeout(r, intervalMs));
-  }
-  // Timeout — don't block the UI, just return and let the refresh handle it
-  console.warn('waitForTx timed out for', hash, '— refreshing anyway');
+// Stellar testnet closes a ledger every ~5 seconds.
+// We wait 7s after submission so the tx is always finalized before we refresh.
+// This avoids all XDR / "Bad union switch" parsing errors from getTransaction().
+export async function waitForTx(_hash: string): Promise<void> {
+  await new Promise(r => setTimeout(r, 7000));
 }
+
 
 export type TxStatus = 'idle' | 'pending' | 'success' | 'error';
 

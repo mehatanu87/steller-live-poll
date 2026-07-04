@@ -63,13 +63,13 @@ export function useVault() {
     field: 'walletBalance' | 'balance' | 'pendingRewards' = 'walletBalance'
   ) => {
     if (!address) return;
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 5; i++) {
       const pos = await fetchUserPosition(address);
       if (oldValue === undefined || pos[field] !== oldValue) {
         setPosition(pos);
         return;
       }
-      await new Promise(r => setTimeout(r, 1500));
+      await new Promise(r => setTimeout(r, 1000));
     }
     // Fallback: set whatever we last fetched
     await refreshPosition();
