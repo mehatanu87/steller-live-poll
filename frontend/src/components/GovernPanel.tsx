@@ -154,6 +154,7 @@ export function GovernPanel({ proposals, position, connected, loading, onCreateP
                       >
                         {busy ? <span className="spinner" style={{ width: 13, height: 13 }} /> : <ThumbsDown size={13} />}
                         Vote Against
+                      </button>
                       </div>
                     </div>
                   )}
