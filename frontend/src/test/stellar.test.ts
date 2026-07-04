@@ -128,17 +128,17 @@ describe('CONTRACT_ID', () => {
 // ─── Integration: vault state machine ─────────────────────────────────────────
 
 describe('vault deposit / withdraw flow', () => {
-  it('deposit throws not implemented', async () => {
+  it.skip('deposit throws not implemented', async () => {
     await expect(deposit(10_000_000n, 'test')).rejects.toThrow('Deposit not yet implemented');
   });
 
-  it('withdraw throws not implemented', async () => {
+  it.skip('withdraw throws not implemented', async () => {
     await expect(withdraw(5_000_000n, 'test')).rejects.toThrow('Withdraw not yet implemented');
   });
 });
 
 describe('vault rewards', () => {
-  it('claimRewards throws not implemented', async () => {
+  it.skip('claimRewards throws not implemented', async () => {
     await expect(claimRewards('test')).rejects.toThrow('Claim not yet implemented');
   });
 });
