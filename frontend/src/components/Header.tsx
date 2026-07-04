@@ -66,7 +66,7 @@ export function Header({ connected, address, balance, loading, onConnect, onDisc
         {/* Network badge + wallet */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {connected && balance !== undefined && (
-            <span className="badge hide-mobile" style={{ background: 'rgba(52,211,153,0.1)', color: 'var(--emerald)', border: '1px solid rgba(52,211,153,0.2)' }}>
+            <span className="badge" style={{ background: 'rgba(52,211,153,0.1)', color: 'var(--emerald)', border: '1px solid rgba(52,211,153,0.2)' }}>
               <Coins size={12} style={{ marginRight: 4 }} />
               {formatXLM(balance)} XLM
             </span>

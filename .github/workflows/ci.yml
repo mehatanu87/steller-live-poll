@@ -147,6 +147,16 @@ jobs:
             --native_token CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC \
             --vote_fee 10000000
 
+          stellar contract invoke \
+            --id $CONTRACT_ID \
+            --source deployer \
+            --network testnet \
+            -- \
+            create_proposal \
+            --proposer $(stellar keys address deployer) \
+            --title "Increase Reward Rate to 15 bps" \
+            --description "Proposal to boost staking incentives by raising the per-block reward rate from 10 to 15 basis points."
+
   # ── Deploy Frontend ──────────────────────────────────────────────────────────
   deploy-frontend:
     name: Deploy Frontend (Vercel)
@@ -166,4 +176,4 @@ jobs:
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: npx vercel@latest --prod --token ${{ secrets.VERCEL_TOKEN }} --yes
+        run: npx vercel@latest --prod --token ${{ secrets.VERCEL_TOKEN }} --build-env VITE_CONTRACT_ID=$CONTRACT_ID --yes
