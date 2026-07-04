@@ -98,14 +98,18 @@ export function useVault() {
   const handleDeposit = useCallback(async (xlmAmount: number) => {
     if (!address) return;
     setLoading(true);
+    const pendingId = `toast-${++toastCounter}`;
+    setToasts(prev => [...prev, { id: pendingId, type: 'info', message: `Confirming deposit of ${xlmAmount} XLM…` }]);
     try {
       const stroops = xlmToStroops(xlmAmount);
       const hash = await deposit(stroops, address);
+      setToasts(prev => prev.filter(t => t.id !== pendingId));
       await refreshStats();
       await refreshPosition();
       addToast('success', `Deposited ${xlmAmount} XLM`, hash);
       return hash;
     } catch (err: unknown) {
+      setToasts(prev => prev.filter(t => t.id !== pendingId));
       const msg = err instanceof Error ? err.message : 'Deposit failed';
       addToast('error', msg);
       throw err;
@@ -117,14 +121,18 @@ export function useVault() {
   const handleWithdraw = useCallback(async (xlmAmount: number) => {
     if (!address) return;
     setLoading(true);
+    const pendingId = `toast-${++toastCounter}`;
+    setToasts(prev => [...prev, { id: pendingId, type: 'info', message: `Confirming withdrawal of ${xlmAmount} XLM…` }]);
     try {
       const stroops = xlmToStroops(xlmAmount);
       const hash = await withdraw(stroops, address);
+      setToasts(prev => prev.filter(t => t.id !== pendingId));
       await refreshStats();
       await refreshPosition();
       addToast('success', `Withdrew ${xlmAmount} XLM`, hash);
       return hash;
     } catch (err: unknown) {
+      setToasts(prev => prev.filter(t => t.id !== pendingId));
       const msg = err instanceof Error ? err.message : 'Withdraw failed';
       addToast('error', msg);
       throw err;
@@ -136,12 +144,16 @@ export function useVault() {
   const handleClaimRewards = useCallback(async () => {
     if (!address) return;
     setLoading(true);
+    const pendingId = `toast-${++toastCounter}`;
+    setToasts(prev => [...prev, { id: pendingId, type: 'info', message: 'Confirming reward claim…' }]);
     try {
       const { hash, amount } = await claimRewards(address);
+      setToasts(prev => prev.filter(t => t.id !== pendingId));
       await refreshPosition();
       addToast('success', `Claimed ${Number(amount) / 10_000_000} XLM rewards`, hash);
       return hash;
     } catch (err: unknown) {
+      setToasts(prev => prev.filter(t => t.id !== pendingId));
       const msg = err instanceof Error ? err.message : 'Claim failed';
       addToast('error', msg);
       throw err;
@@ -153,12 +165,16 @@ export function useVault() {
   const handleCreateProposal = useCallback(async (title: string, description: string) => {
     if (!address) return;
     setLoading(true);
+    const pendingId = `toast-${++toastCounter}`;
+    setToasts(prev => [...prev, { id: pendingId, type: 'info', message: 'Confirming proposal creation…' }]);
     try {
       const id = await createProposal(title, description, address);
-      await refreshStats();
-      addToast('success', `Proposal #${id} created`);
+      setToasts(prev => prev.filter(t => t.id !== pendingId));
+      await refreshStats(); // refreshStats fetches proposals too
+      addToast('success', `Proposal created successfully`);
       return id;
     } catch (err: unknown) {
+      setToasts(prev => prev.filter(t => t.id !== pendingId));
       const msg = err instanceof Error ? err.message : 'Create proposal failed';
       addToast('error', msg);
       throw err;
@@ -170,13 +186,17 @@ export function useVault() {
   const handleVote = useCallback(async (proposalId: number, voteFor: boolean) => {
     if (!address) return;
     setLoading(true);
+    const pendingId = `toast-${++toastCounter}`;
+    setToasts(prev => [...prev, { id: pendingId, type: 'info', message: `Confirming vote on Proposal #${proposalId}…` }]);
     try {
       const hash = await vote(proposalId, voteFor, address);
-      await refreshStats();
+      setToasts(prev => prev.filter(t => t.id !== pendingId));
+      await refreshStats(); // fetches updated proposal votes
       await refreshPosition();
       addToast('success', `Vote cast on Proposal #${proposalId}`, hash);
       return hash;
     } catch (err: unknown) {
+      setToasts(prev => prev.filter(t => t.id !== pendingId));
       const msg = err instanceof Error ? err.message : 'Vote failed';
       addToast('error', msg);
       throw err;

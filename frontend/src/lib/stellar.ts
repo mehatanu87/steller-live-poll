@@ -30,6 +30,24 @@ export const CONTRACT_ID =
 
 export const rpcServer = new SorobanRpc.Server(NETWORK.rpcUrl);
 
+// Poll until a submitted tx is confirmed on-chain (SUCCESS or FAILED)
+export async function waitForTx(hash: string, maxAttempts = 30, intervalMs = 2000): Promise<void> {
+  for (let i = 0; i < maxAttempts; i++) {
+    try {
+      const res = await rpcServer.getTransaction(hash);
+      if (res.status === SorobanRpc.Api.GetTransactionStatus.SUCCESS) return;
+      if (res.status === SorobanRpc.Api.GetTransactionStatus.FAILED) {
+        throw new Error('Transaction failed on-chain');
+      }
+    } catch (e: any) {
+      // NOT_FOUND means still pending — keep polling
+      if (!e?.message?.includes('not found') && !e?.message?.includes('NOT_FOUND')) throw e;
+    }
+    await new Promise(r => setTimeout(r, intervalMs));
+  }
+  throw new Error('Transaction confirmation timed out');
+}
+
 export type TxStatus = 'idle' | 'pending' | 'success' | 'error';
 
 export interface VaultStats {
@@ -185,6 +203,7 @@ export async function vote(proposalId: number, voteFor: boolean, userAddress: st
   const sendRes = await rpcServer.sendTransaction(signedTx as any);
   if (sendRes.status === "ERROR") throw new Error("Transaction failed to submit");
   
+  await waitForTx(sendRes.hash);
   return sendRes.hash;
 }
 
@@ -210,6 +229,7 @@ export async function deposit(amount: bigint, userAddress: string): Promise<stri
   const sendRes = await rpcServer.sendTransaction(signedTx as any);
   if (sendRes.status === "ERROR") throw new Error("Transaction failed to submit");
   
+  await waitForTx(sendRes.hash);
   return sendRes.hash;
 }
 
@@ -235,6 +255,7 @@ export async function withdraw(amount: bigint, userAddress: string): Promise<str
   const sendRes = await rpcServer.sendTransaction(signedTx as any);
   if (sendRes.status === "ERROR") throw new Error("Transaction failed to submit");
   
+  await waitForTx(sendRes.hash);
   return sendRes.hash;
 }
 
@@ -259,6 +280,7 @@ export async function claimRewards(userAddress: string): Promise<{ hash: string;
   const sendRes = await rpcServer.sendTransaction(signedTx as any);
   if (sendRes.status === "ERROR") throw new Error("Transaction failed to submit");
   
+  await waitForTx(sendRes.hash);
   return { hash: sendRes.hash, amount: 0n };
 }
 
@@ -285,6 +307,7 @@ export async function createProposal(title: string, description: string, address
   const sendRes = await rpcServer.sendTransaction(signedTx as any);
   if (sendRes.status === "ERROR") throw new Error("Transaction failed to submit");
   
+  await waitForTx(sendRes.hash);
   return 0; // Returning 0 since we'll refetch proposals anyway
 }
 

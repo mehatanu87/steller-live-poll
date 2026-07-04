@@ -21,7 +21,7 @@ function ToastItem({ toast, onRemove }: { toast: ToastType; onRemove: (id: strin
   const icons = {
     success: <CheckCircle size={16} style={{ color: 'var(--emerald)', flexShrink: 0 }} />,
     error:   <AlertCircle size={16} style={{ color: 'var(--rose)', flexShrink: 0 }} />,
-    info:    <Info size={16} style={{ color: 'var(--cyan)', flexShrink: 0 }} />,
+    info:    <span className="spinner" style={{ width: 15, height: 15, borderTopColor: 'var(--cyan)', flexShrink: 0 }} />,
   };
 
   return (
