@@ -123,9 +123,9 @@ jobs:
 
       - name: Deploy contract
         run: |
-          WASM_PATH=$(find target/wasm32-unknown-unknown/release -name "*.optimized.wasm" | head -n 1)
+          WASM_PATH=$(find target -name "*.optimized.wasm" | head -n 1)
           if [ -z "$WASM_PATH" ]; then
-            WASM_PATH="target/wasm32-unknown-unknown/release/stellar_vault.wasm"
+            WASM_PATH=$(find target -name "stellar_vault.wasm" | head -n 1)
           fi
           CONTRACT_ID=$(stellar contract deploy \
             --wasm $WASM_PATH \
