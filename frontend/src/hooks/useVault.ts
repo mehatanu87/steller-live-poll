@@ -54,7 +54,23 @@ export function useVault() {
     if (!address) return;
     const pos = await fetchUserPosition(address);
     setPosition(pos);
+    return pos;
   }, [address]);
+
+  // Keeps retrying until walletBalance actually changes (Horizon needs 1-3s after tx)
+  const refreshPositionUntilChanged = useCallback(async (oldWalletBalance?: bigint) => {
+    if (!address) return;
+    for (let i = 0; i < 10; i++) {
+      const pos = await fetchUserPosition(address);
+      if (oldWalletBalance === undefined || pos.walletBalance !== oldWalletBalance) {
+        setPosition(pos);
+        return;
+      }
+      await new Promise(r => setTimeout(r, 1500));
+    }
+    // Fallback: set whatever we last fetched
+    await refreshPosition();
+  }, [address, refreshPosition]);
 
   useEffect(() => { refreshStats(); }, [refreshStats]);
   
@@ -98,6 +114,7 @@ export function useVault() {
   const handleDeposit = useCallback(async (xlmAmount: number) => {
     if (!address) return;
     setLoading(true);
+    const oldBalance = position?.walletBalance;
     const pendingId = `toast-${++toastCounter}`;
     setToasts(prev => [...prev, { id: pendingId, type: 'info', message: `Confirming deposit of ${xlmAmount} XLM…` }]);
     try {
@@ -105,7 +122,7 @@ export function useVault() {
       const hash = await deposit(stroops, address);
       setToasts(prev => prev.filter(t => t.id !== pendingId));
       await refreshStats();
-      await refreshPosition();
+      await refreshPositionUntilChanged(oldBalance);
       addToast('success', `Deposited ${xlmAmount} XLM`, hash);
       return hash;
     } catch (err: unknown) {
@@ -116,11 +133,12 @@ export function useVault() {
     } finally {
       setLoading(false);
     }
-  }, [address, addToast, refreshStats, refreshPosition]);
+  }, [address, position, addToast, refreshStats, refreshPositionUntilChanged]);
 
   const handleWithdraw = useCallback(async (xlmAmount: number) => {
     if (!address) return;
     setLoading(true);
+    const oldBalance = position?.walletBalance;
     const pendingId = `toast-${++toastCounter}`;
     setToasts(prev => [...prev, { id: pendingId, type: 'info', message: `Confirming withdrawal of ${xlmAmount} XLM…` }]);
     try {
@@ -128,7 +146,7 @@ export function useVault() {
       const hash = await withdraw(stroops, address);
       setToasts(prev => prev.filter(t => t.id !== pendingId));
       await refreshStats();
-      await refreshPosition();
+      await refreshPositionUntilChanged(oldBalance);
       addToast('success', `Withdrew ${xlmAmount} XLM`, hash);
       return hash;
     } catch (err: unknown) {
@@ -139,17 +157,18 @@ export function useVault() {
     } finally {
       setLoading(false);
     }
-  }, [address, addToast, refreshStats, refreshPosition]);
+  }, [address, position, addToast, refreshStats, refreshPositionUntilChanged]);
 
   const handleClaimRewards = useCallback(async () => {
     if (!address) return;
     setLoading(true);
+    const oldBalance = position?.walletBalance;
     const pendingId = `toast-${++toastCounter}`;
     setToasts(prev => [...prev, { id: pendingId, type: 'info', message: 'Confirming reward claim…' }]);
     try {
       const { hash, amount } = await claimRewards(address);
       setToasts(prev => prev.filter(t => t.id !== pendingId));
-      await refreshPosition();
+      await refreshPositionUntilChanged(oldBalance);
       addToast('success', `Claimed ${Number(amount) / 10_000_000} XLM rewards`, hash);
       return hash;
     } catch (err: unknown) {
@@ -160,7 +179,7 @@ export function useVault() {
     } finally {
       setLoading(false);
     }
-  }, [address, addToast, refreshPosition]);
+  }, [address, position, addToast, refreshPositionUntilChanged]);
 
   const handleCreateProposal = useCallback(async (title: string, description: string) => {
     if (!address) return;
@@ -186,13 +205,14 @@ export function useVault() {
   const handleVote = useCallback(async (proposalId: number, voteFor: boolean) => {
     if (!address) return;
     setLoading(true);
+    const oldBalance = position?.walletBalance;
     const pendingId = `toast-${++toastCounter}`;
     setToasts(prev => [...prev, { id: pendingId, type: 'info', message: `Confirming vote on Proposal #${proposalId}…` }]);
     try {
       const hash = await vote(proposalId, voteFor, address);
       setToasts(prev => prev.filter(t => t.id !== pendingId));
       await refreshStats(); // fetches updated proposal votes
-      await refreshPosition();
+      await refreshPositionUntilChanged(oldBalance); // waits for 1 XLM fee to reflect
       addToast('success', `Vote cast on Proposal #${proposalId}`, hash);
       return hash;
     } catch (err: unknown) {
@@ -203,7 +223,7 @@ export function useVault() {
     } finally {
       setLoading(false);
     }
-  }, [address, addToast, refreshStats, refreshPosition]);
+  }, [address, position, addToast, refreshStats, refreshPositionUntilChanged]);
 
   return {
     connected, address, stats, position, proposals,
