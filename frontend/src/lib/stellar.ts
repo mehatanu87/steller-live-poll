@@ -248,6 +248,7 @@ export async function createProposal(title: string, description: string, address
     votesFor: 0,
     votesAgainst: 0,
     active: true,
+    createdAt: Date.now(),
   });
   
   return nextId;
