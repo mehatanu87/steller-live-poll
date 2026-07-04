@@ -86,8 +86,9 @@ export async function fetchProposals(): Promise<Proposal[]> {
 
 export async function connectWallet(): Promise<string> {
   if (await isConnected()) {
-    const pubKey = await requestAccess();
-    return pubKey;
+    const res = await requestAccess();
+    if (res.error) throw new Error(res.error);
+    return res.address;
   }
   throw new Error("Freighter is not installed");
 }
@@ -123,10 +124,12 @@ export async function vote(proposalId: number, voteFor: boolean, userAddress: st
     .build();
 
   const preparedTx = await rpcServer.prepareTransaction(tx);
-  const signedTxStr = await signTransaction(preparedTx.toXDR(), { network: NETWORK.name });
-  const signedTx = xdr.TransactionEnvelope.fromXDR(signedTxStr, "base64");
+  const signRes = await signTransaction(preparedTx.toXDR(), { networkPassphrase: NETWORK.networkPassphrase });
+  if (signRes.error) throw new Error(signRes.error);
   
-  const sendRes = await rpcServer.sendTransaction(signedTx);
+  const signedTx = TransactionBuilder.fromXDR(signRes.signedTxXdr, NETWORK.networkPassphrase);
+  
+  const sendRes = await rpcServer.sendTransaction(signedTx as any);
   if (sendRes.status === "ERROR") throw new Error("Transaction failed to submit");
   
   const p = _proposals.find(p => p.id === proposalId);
