@@ -11,24 +11,25 @@
     "test:run": "vitest run"
   },
   "dependencies": {
-    "@stellar/stellar-sdk": "^12.0.0",
+    "@stellar/freighter-api": "^6.0.1",
+    "@stellar/stellar-sdk": "^12.3.0",
+    "clsx": "^2.1.1",
+    "framer-motion": "^11.3.19",
+    "lucide-react": "^0.383.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "framer-motion": "^11.3.19",
-    "recharts": "^2.12.7",
-    "lucide-react": "^0.383.0",
-    "clsx": "^2.1.1"
+    "recharts": "^2.12.7"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.4.6",
+    "@testing-library/react": "^16.0.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
     "@vitest/coverage-v8": "^2.0.5",
+    "jsdom": "^24.1.1",
     "typescript": "^5.2.2",
     "vite": "^5.3.4",
-    "vitest": "^2.0.5",
-    "jsdom": "^24.1.1",
-    "@testing-library/react": "^16.0.0",
-    "@testing-library/jest-dom": "^6.4.6"
+    "vitest": "^2.0.5"
   }
 }

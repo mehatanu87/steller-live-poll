@@ -1,9 +1,21 @@
-// ─── Stellar / Soroban Integration ───────────────────────────────────────────
-// Wraps all contract calls and wallet interactions in a clean, typed API.
+import {
+  isConnected,
+  requestAccess,
+  signTransaction,
+} from "@stellar/freighter-api";
+import {
+  SorobanRpc,
+  TransactionBuilder,
+  Networks,
+  Address,
+  nativeToScVal,
+  xdr,
+  Contract,
+} from "@stellar/stellar-sdk";
 
 export const NETWORK = {
   name: 'TESTNET',
-  networkPassphrase: 'Test SDF Network ; September 2015',
+  networkPassphrase: Networks.TESTNET,
   rpcUrl: 'https://soroban-testnet.stellar.org',
   horizonUrl: 'https://horizon-testnet.stellar.org',
   explorerUrl: 'https://stellar.expert/explorer/testnet',
@@ -11,11 +23,12 @@ export const NETWORK = {
 
 export const CONTRACT_ID =
   import.meta.env.VITE_CONTRACT_ID ||
-  'CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM';
+  'CBLBZWNHE26XAVUK6SRWFBCGKSRNEWPFGRHYTLXPKKSZO2VEQVN2PLYP';
+
+export const rpcServer = new SorobanRpc.Server(NETWORK.rpcUrl);
 
 export type TxStatus = 'idle' | 'pending' | 'success' | 'error';
 
-// Simulated on-chain state for demo (no real wallet required to explore UI)
 export interface VaultStats {
   totalDeposited: bigint;
   totalWithdrawn: bigint;
@@ -41,8 +54,7 @@ export interface UserPosition {
   hasVoted: Record<number, boolean>;
 }
 
-// ─── Mock contract state (swapped for real soroban calls in production) ────
-
+// Keep stats and proposals mocked for demo UI, but we fetch REAL balance and submit REAL txs
 let _stats: VaultStats = {
   totalDeposited: BigInt(2_847_000_000),
   totalWithdrawn:  BigInt(318_000_000),
@@ -55,121 +67,91 @@ let _proposals: Proposal[] = [
   {
     id: 1,
     title: 'Increase Reward Rate to 15 bps',
-    description: 'Proposal to boost staking incentives by raising the per-block reward rate from 10 to 15 basis points, attracting deeper liquidity.',
+    description: 'Proposal to boost staking incentives by raising the per-block reward rate from 10 to 15 basis points.',
     proposer: 'GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPGQS7Z5QUEUELA7HHBSB77M4',
     votesFor: 87,
     votesAgainst: 23,
     active: true,
     createdAt: Date.now() - 86_400_000,
-  },
-  {
-    id: 2,
-    title: 'Add Emergency Withdrawal Feature',
-    description: 'Enable a 48-hour cooldown emergency withdrawal for stakers, capped at 10% penalty, to improve protocol safety during black swan events.',
-    proposer: 'GDQP2KPQGKIHYJGXNUIYOMHARUARCA7DJT5FO2FFOOKY3B2WSQHG4W3',
-    votesFor: 54,
-    votesAgainst: 61,
-    active: true,
-    createdAt: Date.now() - 172_800_000,
-  },
-  {
-    id: 3,
-    title: 'Treasury Diversification into USDC',
-    description: 'Allocate 20% of protocol treasury into USDC to hedge XLM volatility and fund future development milestones.',
-    proposer: 'GDQP2KPQGKIHYJGXNUIYOMHARUARCA7DJT5FO2FFOOKY3B2WSQHG4W3',
-    votesFor: 128,
-    votesAgainst: 11,
-    active: false,
-    createdAt: Date.now() - 432_000_000,
-  },
+  }
 ];
 
-let _userPos: UserPosition = {
-  balance: BigInt(0),
-  pendingRewards: BigInt(0),
-  hasVoted: {},
-};
-
-let _txCount = 0;
-const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
-const fakeHash = () => Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
-
-// ─── Public API ───────────────────────────────────────────────────────────────
-
 export async function fetchVaultStats(): Promise<VaultStats> {
-  await sleep(400);
-  return { ..._stats };
-}
-
-export async function fetchUserPosition(address: string): Promise<UserPosition> {
-  await sleep(300);
-  // Simulate small reward accrual
-  if (_userPos.balance > 0n) {
-    _userPos.pendingRewards += BigInt(Math.floor(Math.random() * 1000));
-  }
-  return { ..._userPos, hasVoted: { ..._userPos.hasVoted } };
-}
-
-export async function deposit(amount: bigint): Promise<string> {
-  await sleep(1200);
-  _userPos.balance += amount;
-  _stats.totalDeposited += amount;
-  if (_userPos.balance === amount) _stats.totalStakers += 1;
-  _txCount++;
-  return fakeHash();
-}
-
-export async function withdraw(amount: bigint): Promise<string> {
-  await sleep(1200);
-  if (_userPos.balance < amount) throw new Error('Insufficient balance');
-  _userPos.balance -= amount;
-  _stats.totalWithdrawn += amount;
-  if (_userPos.balance === 0n && _stats.totalStakers > 0) _stats.totalStakers -= 1;
-  _txCount++;
-  return fakeHash();
-}
-
-export async function claimRewards(): Promise<{ hash: string; amount: bigint }> {
-  await sleep(1200);
-  if (_userPos.pendingRewards === 0n) throw new Error('No rewards to claim');
-  const amount = _userPos.pendingRewards;
-  _userPos.pendingRewards = 0n;
-  _txCount++;
-  return { hash: fakeHash(), amount };
+  return _stats;
 }
 
 export async function fetchProposals(): Promise<Proposal[]> {
-  await sleep(350);
-  return [..._proposals];
+  return _proposals;
+}
+
+export async function connectWallet(): Promise<string> {
+  if (await isConnected()) {
+    const pubKey = await requestAccess();
+    return pubKey;
+  }
+  throw new Error("Freighter is not installed");
+}
+
+export async function fetchUserPosition(address: string): Promise<UserPosition> {
+  try {
+    const res = await fetch(`${NETWORK.horizonUrl}/accounts/${address}`);
+    if (!res.ok) return { balance: 0n, pendingRewards: 0n, hasVoted: {} };
+    const data = await res.json();
+    const nativeBal = data.balances.find((b: any) => b.asset_type === "native");
+    return {
+      balance: nativeBal ? xlmToStroops(parseFloat(nativeBal.balance)) : 0n,
+      pendingRewards: 0n,
+      hasVoted: {},
+    };
+  } catch (e) {
+    return { balance: 0n, pendingRewards: 0n, hasVoted: {} };
+  }
+}
+
+export async function vote(proposalId: number, voteFor: boolean, userAddress: string): Promise<string> {
+  const account = await rpcServer.getAccount(userAddress);
+  const contract = new Contract(CONTRACT_ID);
+  const tx = new TransactionBuilder(account, { fee: "1000", networkPassphrase: NETWORK.networkPassphrase })
+    .addOperation(
+      contract.call("vote",
+        new Address(userAddress).toScVal(),
+        nativeToScVal(proposalId, { type: 'u64' }),
+        nativeToScVal(voteFor, { type: 'bool' })
+      )
+    )
+    .setTimeout(60)
+    .build();
+
+  const preparedTx = await rpcServer.prepareTransaction(tx);
+  const signedTxStr = await signTransaction(preparedTx.toXDR(), { network: NETWORK.name });
+  const signedTx = xdr.TransactionEnvelope.fromXDR(signedTxStr, "base64");
+  
+  const sendRes = await rpcServer.sendTransaction(signedTx);
+  if (sendRes.status === "ERROR") throw new Error("Transaction failed to submit");
+  
+  const p = _proposals.find(p => p.id === proposalId);
+  if (p) {
+    if (voteFor) p.votesFor += 1;
+    else p.votesAgainst += 1;
+  }
+  
+  return sendRes.hash;
+}
+
+export async function deposit(amount: bigint, userAddress: string): Promise<string> {
+  throw new Error("Deposit not yet implemented for real wallet integration.");
+}
+
+export async function withdraw(amount: bigint, userAddress: string): Promise<string> {
+  throw new Error("Withdraw not yet implemented for real wallet integration.");
+}
+
+export async function claimRewards(userAddress: string): Promise<{ hash: string; amount: bigint }> {
+  throw new Error("Claim not yet implemented for real wallet integration.");
 }
 
 export async function createProposal(title: string, description: string, address: string): Promise<number> {
-  await sleep(1500);
-  if (_userPos.balance === 0n) throw new Error('Must have staked balance to propose');
-  const id = _proposals.length + 1;
-  _proposals.unshift({
-    id, title, description,
-    proposer: address,
-    votesFor: 0,
-    votesAgainst: 0,
-    active: true,
-    createdAt: Date.now(),
-  });
-  return id;
-}
-
-export async function vote(proposalId: number, voteFor: boolean): Promise<string> {
-  await sleep(1000);
-  if (_userPos.balance === 0n) throw new Error('Must have staked balance to vote');
-  if (_userPos.hasVoted[proposalId]) throw new Error('Already voted');
-  const p = _proposals.find(p => p.id === proposalId);
-  if (!p) throw new Error('Proposal not found');
-  if (!p.active) throw new Error('Proposal is closed');
-  const power = Math.floor(Math.sqrt(Number(_userPos.balance / 10_000_000n)));
-  if (voteFor) p.votesFor += Math.max(1, power);
-  else p.votesAgainst += Math.max(1, power);
-  _userPos.hasVoted[proposalId] = true;
-  return fakeHash();
+  throw new Error("Create Proposal not yet implemented for real wallet integration.");
 }
 
 // ─── Formatting helpers ───────────────────────────────────────────────────────

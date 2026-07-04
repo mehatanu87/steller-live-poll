@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   fetchVaultStats, fetchUserPosition,
   deposit, withdraw, claimRewards,
-  fetchProposals, createProposal, vote,
+  fetchProposals, createProposal, vote, connectWallet,
   VaultStats, UserPosition, Proposal,
   xlmToStroops,
 } from '../lib/stellar';
@@ -17,10 +17,6 @@ export interface Toast {
 }
 
 let toastCounter = 0;
-
-// ─── Wallet mock (replace with Freighter SDK) ─────────────────────────────────
-
-const DEMO_ADDRESS = 'GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPGQS7Z5QUEUELA7HHBSB77M4';
 
 export function useVault() {
   const [connected, setConnected] = useState(false);
@@ -61,10 +57,12 @@ export function useVault() {
   }, [address]);
 
   useEffect(() => { refreshStats(); }, [refreshStats]);
+  
   useEffect(() => {
     if (!address) return;
     refreshPosition();
-    const iv = setInterval(refreshPosition, 8000);
+    // Refresh balance often to catch external incoming txs
+    const iv = setInterval(refreshPosition, 5000);
     return () => clearInterval(iv);
   }, [address, refreshPosition]);
 
@@ -76,13 +74,18 @@ export function useVault() {
 
   const connect = useCallback(async () => {
     setLoading(true);
-    await new Promise(r => setTimeout(r, 800));
-    setConnected(true);
-    setAddress(DEMO_ADDRESS);
-    const pos = await fetchUserPosition(DEMO_ADDRESS);
-    setPosition(pos);
-    setLoading(false);
-    addToast('success', 'Wallet connected successfully');
+    try {
+      const pubKey = await connectWallet();
+      setConnected(true);
+      setAddress(pubKey);
+      const pos = await fetchUserPosition(pubKey);
+      setPosition(pos);
+      addToast('success', 'Wallet connected successfully');
+    } catch (e: any) {
+      addToast('error', e.message || 'Connection failed');
+    } finally {
+      setLoading(false);
+    }
   }, [addToast]);
 
   const disconnect = useCallback(() => {
@@ -93,10 +96,11 @@ export function useVault() {
   }, [addToast]);
 
   const handleDeposit = useCallback(async (xlmAmount: number) => {
+    if (!address) return;
     setLoading(true);
     try {
       const stroops = xlmToStroops(xlmAmount);
-      const hash = await deposit(stroops);
+      const hash = await deposit(stroops, address);
       await refreshStats();
       await refreshPosition();
       addToast('success', `Deposited ${xlmAmount} XLM`, hash);
@@ -108,13 +112,14 @@ export function useVault() {
     } finally {
       setLoading(false);
     }
-  }, [addToast, refreshStats, refreshPosition]);
+  }, [address, addToast, refreshStats, refreshPosition]);
 
   const handleWithdraw = useCallback(async (xlmAmount: number) => {
+    if (!address) return;
     setLoading(true);
     try {
       const stroops = xlmToStroops(xlmAmount);
-      const hash = await withdraw(stroops);
+      const hash = await withdraw(stroops, address);
       await refreshStats();
       await refreshPosition();
       addToast('success', `Withdrew ${xlmAmount} XLM`, hash);
@@ -126,12 +131,13 @@ export function useVault() {
     } finally {
       setLoading(false);
     }
-  }, [addToast, refreshStats, refreshPosition]);
+  }, [address, addToast, refreshStats, refreshPosition]);
 
   const handleClaimRewards = useCallback(async () => {
+    if (!address) return;
     setLoading(true);
     try {
-      const { hash, amount } = await claimRewards();
+      const { hash, amount } = await claimRewards(address);
       await refreshPosition();
       addToast('success', `Claimed ${Number(amount) / 10_000_000} XLM rewards`, hash);
       return hash;
@@ -142,9 +148,10 @@ export function useVault() {
     } finally {
       setLoading(false);
     }
-  }, [addToast, refreshPosition]);
+  }, [address, addToast, refreshPosition]);
 
   const handleCreateProposal = useCallback(async (title: string, description: string) => {
+    if (!address) return;
     setLoading(true);
     try {
       const id = await createProposal(title, description, address);
@@ -158,12 +165,13 @@ export function useVault() {
     } finally {
       setLoading(false);
     }
-  }, [addToast, address, refreshStats]);
+  }, [address, addToast, refreshStats]);
 
   const handleVote = useCallback(async (proposalId: number, voteFor: boolean) => {
+    if (!address) return;
     setLoading(true);
     try {
-      const hash = await vote(proposalId, voteFor);
+      const hash = await vote(proposalId, voteFor, address);
       await refreshStats();
       await refreshPosition();
       addToast('success', `Vote cast on Proposal #${proposalId}`, hash);
@@ -175,7 +183,7 @@ export function useVault() {
     } finally {
       setLoading(false);
     }
-  }, [addToast, refreshStats, refreshPosition]);
+  }, [address, addToast, refreshStats, refreshPosition]);
 
   return {
     connected, address, stats, position, proposals,

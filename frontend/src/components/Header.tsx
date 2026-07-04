@@ -1,16 +1,17 @@
 import React from 'react';
-import { Wallet, Hexagon, ChevronDown, ExternalLink, LogOut, Copy } from 'lucide-react';
-import { shortenAddress, NETWORK } from '../lib/stellar';
+import { Wallet, Hexagon, ChevronDown, ExternalLink, LogOut, Copy, Coins } from 'lucide-react';
+import { shortenAddress, NETWORK, formatXLM } from '../lib/stellar';
 
 interface HeaderProps {
   connected: boolean;
   address: string;
+  balance?: bigint;
   loading: boolean;
   onConnect: () => void;
   onDisconnect: () => void;
 }
 
-export function Header({ connected, address, loading, onConnect, onDisconnect }: HeaderProps) {
+export function Header({ connected, address, balance, loading, onConnect, onDisconnect }: HeaderProps) {
   const [menuOpen, setMenuOpen] = React.useState(false);
 
   const copyAddress = () => {
@@ -64,6 +65,12 @@ export function Header({ connected, address, loading, onConnect, onDisconnect }:
 
         {/* Network badge + wallet */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {connected && balance !== undefined && (
+            <span className="badge hide-mobile" style={{ background: 'rgba(52,211,153,0.1)', color: 'var(--emerald)', border: '1px solid rgba(52,211,153,0.2)' }}>
+              <Coins size={12} style={{ marginRight: 4 }} />
+              {formatXLM(balance)} XLM
+            </span>
+          )}
           <span className="badge badge-amber hide-mobile">
             <span className="pulse-dot" style={{ background: 'var(--amber)' }} />
             {NETWORK.name}
@@ -103,6 +110,11 @@ export function Header({ connected, address, loading, onConnect, onDisconnect }:
                   <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', marginBottom: 4 }}>
                     <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-display)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Connected</div>
                     <div style={{ fontSize: 13, fontFamily: 'var(--font-mono)', marginTop: 2, color: 'var(--text-secondary)' }}>{shortenAddress(address)}</div>
+                    {balance !== undefined && (
+                      <div style={{ fontSize: 12, color: 'var(--emerald)', marginTop: 4, fontWeight: 500 }}>
+                        {formatXLM(balance)} XLM
+                      </div>
+                    )}
                   </div>
                   <MenuBtn icon={<Copy size={14} />} label="Copy Address" onClick={copyAddress} />
                   <MenuBtn

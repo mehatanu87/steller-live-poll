@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, ThumbsUp, ThumbsDown, CheckCircle, Clock, XCircle, ChevronDown } from 'lucide-react';
+import { Plus, ThumbsUp, ThumbsDown, CheckCircle, Clock, XCircle, ChevronDown, Info } from 'lucide-react';
 import { Proposal, UserPosition, shortenAddress } from '../lib/stellar';
 
 interface GovernPanelProps {
@@ -131,7 +131,12 @@ export function GovernPanel({ proposals, position, connected, loading, onCreateP
                   <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.65, marginBottom: 16 }}>{p.description}</p>
 
                   {connected && p.active && !voted && hasStake && (
-                    <div style={{ display: 'flex', gap: 10 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                        <Info size={13} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle', color: 'var(--amber)' }} />
+                        <span style={{ verticalAlign: 'middle' }}>Casting a vote requires a <strong>1 XLM fee</strong>. You will be prompted to sign the transaction.</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 10 }}>
                       <button
                         className="btn btn-sm"
                         onClick={(e) => { e.stopPropagation(); handleVote(p.id, true); }}
@@ -149,7 +154,7 @@ export function GovernPanel({ proposals, position, connected, loading, onCreateP
                       >
                         {busy ? <span className="spinner" style={{ width: 13, height: 13 }} /> : <ThumbsDown size={13} />}
                         Vote Against
-                      </button>
+                      </div>
                     </div>
                   )}
 
