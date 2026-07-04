@@ -52,6 +52,12 @@
 
 ---
 
+## 🔗 Transaction Hashes (Testnet)
+
+| Action | Transaction Hash / Link |
+|---|---|
+| Contract Interaction (Vote) | View on [Stellar Expert](https://stellar.expert/explorer/testnet/contract/CBLBZWNHE26XAVUK6SRWFBCGKSRNEWPFGRHYTLXPKKSZO2VEQVN2PLYP) |
+
 ## 🏗️ Overview
 
 StellarVault is a **complete end-to-end Stellar dApp** featuring a Soroban smart contract for XLM staking with:
@@ -136,14 +142,4 @@ Every push to `main` triggers 4 jobs automatically:
 
 ---
 
-## 🔗 Transaction Hashes (Testnet)
 
-| Action | Transaction Hash / Link |
-|---|---|
-| Contract Interaction (Vote) | View on [Stellar Expert](https://stellar.expert/explorer/testnet/contract/CBLBZWNHE26XAVUK6SRWFBCGKSRNEWPFGRHYTLXPKKSZO2VEQVN2PLYP) |
-
----
-
-## 📄 License
-
-MIT © 2026 StellarVault
