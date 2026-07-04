@@ -13,6 +13,7 @@ import {
   xdr,
   Contract,
   Account,
+  Keypair,
 } from "@stellar/stellar-sdk";
 
 export const NETWORK = {
@@ -57,15 +58,16 @@ export interface UserPosition {
   hasVoted: Record<number, boolean>;
 }
 // Helper to simulate read queries without needing a real user sequence
-async function simulateQuery(method: string, args: xdr.ScVal[] = [], sourceAccount = 'GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPGQS7Z5QUEUELA7HHBSB77M4') {
+async function simulateQuery(method: string, args: xdr.ScVal[] = [], sourceAccount?: string) {
   try {
-    const account = new Account(sourceAccount, "0");
+    const pubKey = sourceAccount || Keypair.random().publicKey();
+    const account = new Account(pubKey, "0");
     const contract = new Contract(CONTRACT_ID);
     const tx = new TransactionBuilder(account, { fee: "100", networkPassphrase: NETWORK.networkPassphrase })
       .addOperation(contract.call(method, ...args))
       .setTimeout(30).build();
     const sim = await rpcServer.simulateTransaction(tx);
-    if (SorobanRpc.Api.isSimulationSuccess(sim)) {
+    if (SorobanRpc.Api.isSimulationSuccess(sim) && sim.result) {
       return scValToNative(sim.result.retval);
     }
   } catch (e) {
