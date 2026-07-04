@@ -69,7 +69,7 @@ jobs:
         run: npm run build
         env:
           VITE_NETWORK: testnet
-          VITE_CONTRACT_ID: ${{ secrets.CONTRACT_ID || 'CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM' }}
+          VITE_CONTRACT_ID: ${{ secrets.CONTRACT_ID || 'CBLBZWNHE26XAVUK6SRWFBCGKSRNEWPFGRHYTLXPKKSZO2VEQVN2PLYP' }}
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -83,6 +83,8 @@ jobs:
     needs: contract-test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
+    outputs:
+      contract_id: ${{ steps.deploy.outputs.contract_id }}
     steps:
       - uses: actions/checkout@v4
 
@@ -120,8 +122,10 @@ jobs:
         run: |
           stellar keys generate deployer --network testnet
           stellar keys fund deployer --network testnet
+          sleep 5
 
       - name: Deploy contract
+        id: deploy
         run: |
           WASM_PATH=$(find target -name "*.optimized.wasm" | head -n 1)
           if [ -z "$WASM_PATH" ]; then
@@ -131,11 +135,14 @@ jobs:
             --wasm $WASM_PATH \
             --source deployer \
             --network testnet)
+          echo "contract_id=$CONTRACT_ID" >> $GITHUB_OUTPUT
           echo "CONTRACT_ID=$CONTRACT_ID" >> $GITHUB_ENV
           echo "Deployed contract: $CONTRACT_ID"
 
       - name: Initialize contract
         run: |
+          NATIVE_TOKEN=CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC
+
           stellar contract invoke \
             --id $CONTRACT_ID \
             --source deployer \
@@ -144,7 +151,7 @@ jobs:
             initialize \
             --admin $(stellar keys address deployer) \
             --reward_rate 10 \
-            --native_token CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC \
+            --native_token $NATIVE_TOKEN \
             --vote_fee 10000000
 
           stellar contract invoke \
@@ -154,7 +161,7 @@ jobs:
             -- \
             deposit \
             --user $(stellar keys address deployer) \
-            --amount 10000000
+            --amount 100000000
 
           stellar contract invoke \
             --id $CONTRACT_ID \
@@ -175,14 +182,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download frontend build
-        uses: actions/download-artifact@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          name: frontend-build
-          path: frontend/dist
+          node-version: '20'
+
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Build frontend with new contract ID
+        working-directory: ./frontend
+        env:
+          VITE_NETWORK: testnet
+          VITE_CONTRACT_ID: ${{ needs.deploy-contract.outputs.contract_id }}
+        run: npm run build
 
       - name: Deploy to Vercel
+        working-directory: ./frontend
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: npx vercel@latest --prod --token ${{ secrets.VERCEL_TOKEN }} --build-env VITE_CONTRACT_ID=$CONTRACT_ID --yes
+        run: |
+          npx vercel@latest --prod \
+            --token ${{ secrets.VERCEL_TOKEN }} \
+            --build-env VITE_CONTRACT_ID=${{ needs.deploy-contract.outputs.contract_id }} \
+            --yes

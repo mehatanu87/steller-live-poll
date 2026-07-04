@@ -144,6 +144,15 @@ impl StellarVault {
             panic!("amount must be positive");
         }
 
+        // Actually transfer XLM from user's wallet into the contract
+        let native_token: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::NativeToken)
+            .expect("native token not set");
+        let token_client = token::Client::new(&env, &native_token);
+        token_client.transfer(&user, &env.current_contract_address(), &amount);
+
         let current_balance: i128 = env
             .storage()
             .persistent()
@@ -222,6 +231,15 @@ impl StellarVault {
         env.storage()
             .persistent()
             .set(&DataKey::UserBalance(user.clone()), &new_balance);
+
+        // Transfer XLM from contract back to user
+        let native_token: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::NativeToken)
+            .expect("native token not set");
+        let token_client = token::Client::new(&env, &native_token);
+        token_client.transfer(&env.current_contract_address(), &user, &amount);
 
         // Update total withdrawn
         let total_withdrawn: i128 = env
