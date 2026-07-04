@@ -1,7 +1,7 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype,
+    contract, contractimpl, contracttype, token,
     Address, Env, String,
     symbol_short, log,
 };
@@ -24,6 +24,8 @@ pub enum DataKey {
     Proposal(u64),
     ProposalCount,
     Vote(u64, Address),
+    NativeToken,
+    VoteFee,
 }
 
 // ─── Data Types ───────────────────────────────────────────────────────────────
@@ -107,8 +109,8 @@ pub struct StellarVault;
 impl StellarVault {
     // ── Initialization ──────────────────────────────────────────────────────
 
-    /// Initialize the vault with an admin, reward rate (basis points per block).
-    pub fn initialize(env: Env, admin: Address, reward_rate: u32) {
+    /// Initialize the vault with an admin, reward rate, native token, and vote fee.
+    pub fn initialize(env: Env, admin: Address, reward_rate: u32, native_token: Address, vote_fee: i128) {
         if env.storage().instance().has(&DataKey::Admin) {
             panic!("already initialized");
         }
@@ -125,6 +127,8 @@ impl StellarVault {
             &DataKey::LastRewardBlock,
             &env.ledger().sequence(),
         );
+        env.storage().instance().set(&DataKey::NativeToken, &native_token);
+        env.storage().instance().set(&DataKey::VoteFee, &vote_fee);
 
         log!(&env, "StellarVault initialized by {}", admin);
     }
@@ -381,6 +385,13 @@ impl StellarVault {
             panic!("proposal is not active");
         }
 
+        let fee: i128 = env.storage().instance().get(&DataKey::VoteFee).unwrap_or(0);
+        if fee > 0 {
+            let native_token: Address = env.storage().instance().get(&DataKey::NativeToken).expect("native token not set");
+            let token_client = token::Client::new(&env, &native_token);
+            token_client.transfer(&voter, &env.current_contract_address(), &fee);
+        }
+
         // Voting power = sqrt(staked balance) for quadratic voting
         let voting_power = Self::sqrt(balance as u64);
 
@@ -590,19 +601,20 @@ mod tests {
     use super::*;
     use soroban_sdk::{testutils::Address as _, Env, Address, String};
 
-    fn setup_env() -> (Env, Address, StellarVaultClient<'static>) {
+    fn setup_env() -> (Env, Address, StellarVaultClient<'static>, Address) {
         let env = Env::default();
         env.mock_all_auths();
         let admin = Address::generate(&env);
+        let native_token = env.register_stellar_asset_contract(admin.clone());
         let contract_id = env.register_contract(None, StellarVault);
         let client = StellarVaultClient::new(&env, &contract_id);
-        client.initialize(&admin, &10u32);
-        (env, admin, client)
+        client.initialize(&admin, &10u32, &native_token, &10_000_000_i128);
+        (env, admin, client, native_token)
     }
 
     #[test]
     fn test_initialize() {
-        let (_env, admin, client) = setup_env();
+        let (_env, admin, client, _) = setup_env();
         let stats = client.get_vault_stats();
         assert!(stats.vault_open);
         assert_eq!(stats.total_deposited, 0);
@@ -612,7 +624,7 @@ mod tests {
 
     #[test]
     fn test_deposit_and_withdraw() {
-        let (env, _admin, client) = setup_env();
+        let (env, _admin, client, _) = setup_env();
         let user = Address::generate(&env);
 
         // Deposit
@@ -633,7 +645,7 @@ mod tests {
 
     #[test]
     fn test_vault_stats_staker_count() {
-        let (env, _admin, client) = setup_env();
+        let (env, _admin, client, _) = setup_env();
         let user1 = Address::generate(&env);
         let user2 = Address::generate(&env);
 
@@ -647,7 +659,7 @@ mod tests {
 
     #[test]
     fn test_governance_proposal_and_vote() {
-        let (env, _admin, client) = setup_env();
+        let (env, admin, client, native_token) = setup_env();
         let proposer = Address::generate(&env);
         let voter = Address::generate(&env);
 
@@ -659,6 +671,11 @@ mod tests {
         let desc = String::from_str(&env, "Proposal to increase reward rate from 10 to 20 bps");
         let proposal_id = client.create_proposal(&proposer, &title, &desc);
         assert_eq!(proposal_id, 1);
+
+        // Mint native tokens to voters for the fee
+        let token_admin_client = token::StellarAssetClient::new(&env, &native_token);
+        token_admin_client.mint(&voter, &100_000_000);
+        token_admin_client.mint(&proposer, &100_000_000);
 
         client.vote(&voter, &1u64, &true);
         client.vote(&proposer, &1u64, &false);
@@ -672,7 +689,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_vault_closed_prevents_deposit() {
-        let (env, admin, client) = setup_env();
+        let (env, admin, client, _) = setup_env();
         let user = Address::generate(&env);
 
         client.set_vault_open(&admin, &false);
@@ -682,7 +699,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_cannot_withdraw_more_than_balance() {
-        let (env, _admin, client) = setup_env();
+        let (env, _admin, client, _) = setup_env();
         let user = Address::generate(&env);
         client.deposit(&user, &100_000_i128);
         client.withdraw(&user, &999_999_i128);
@@ -691,7 +708,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_non_admin_cannot_close_vault() {
-        let (env, _admin, client) = setup_env();
+        let (env, _admin, client, _) = setup_env();
         let attacker = Address::generate(&env);
         client.set_vault_open(&attacker, &false);
     }

@@ -140,9 +140,12 @@ jobs:
             --id $CONTRACT_ID \
             --source deployer \
             --network testnet \
-            -- initialize \
+            -- \
+            initialize \
             --admin $(stellar keys address deployer) \
-            --reward_rate 10
+            --reward_rate 10 \
+            --native_token CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC \
+            --vote_fee 10000000
 
   # ── Deploy Frontend ──────────────────────────────────────────────────────────
   deploy-frontend:
