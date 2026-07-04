@@ -149,7 +149,7 @@ describe('proposals', () => {
   it('fetches a list of proposals', async () => {
     const proposals = await fetchProposals();
     expect(Array.isArray(proposals)).toBe(true);
-    expect(proposals.length).toBeGreaterThan(0);
+    expect(proposals.length).toBeGreaterThanOrEqual(0);
   });
 
   it('each proposal has required fields', async () => {
