@@ -117,7 +117,7 @@ export function useVault() {
   const handleDeposit = useCallback(async (xlmAmount: number) => {
     if (!address) return;
     setLoading(true);
-    const oldStaked = position?.balance; // deposit updates contract staked balance, NOT wallet
+    const oldWallet = position?.walletBalance; // real XLM now leaves wallet on deposit
     const pendingId = `toast-${++toastCounter}`;
     setToasts(prev => [...prev, { id: pendingId, type: 'info', message: `Confirming deposit of ${xlmAmount} XLM…` }]);
     try {
@@ -125,7 +125,7 @@ export function useVault() {
       const hash = await deposit(stroops, address);
       setToasts(prev => prev.filter(t => t.id !== pendingId));
       await refreshStats();
-      await refreshPositionUntilChanged(oldStaked, 'balance');
+      await refreshPositionUntilChanged(oldWallet, 'walletBalance');
       addToast('success', `Deposited ${xlmAmount} XLM`, hash);
       return hash;
     } catch (err: unknown) {
@@ -141,7 +141,7 @@ export function useVault() {
   const handleWithdraw = useCallback(async (xlmAmount: number) => {
     if (!address) return;
     setLoading(true);
-    const oldStaked = position?.balance; // withdraw updates contract staked balance, NOT wallet
+    const oldWallet = position?.walletBalance; // real XLM returns to wallet on withdraw
     const pendingId = `toast-${++toastCounter}`;
     setToasts(prev => [...prev, { id: pendingId, type: 'info', message: `Confirming withdrawal of ${xlmAmount} XLM…` }]);
     try {
@@ -149,7 +149,7 @@ export function useVault() {
       const hash = await withdraw(stroops, address);
       setToasts(prev => prev.filter(t => t.id !== pendingId));
       await refreshStats();
-      await refreshPositionUntilChanged(oldStaked, 'balance');
+      await refreshPositionUntilChanged(oldWallet, 'walletBalance');
       addToast('success', `Withdrew ${xlmAmount} XLM`, hash);
       return hash;
     } catch (err: unknown) {

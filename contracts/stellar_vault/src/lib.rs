@@ -630,6 +630,11 @@ mod tests {
         (env, admin, client, native_token)
     }
 
+    /// Mint native tokens to an address using the admin key
+    fn mint(env: &Env, native_token: &Address, to: &Address, amount: i128) {
+        token::StellarAssetClient::new(env, native_token).mint(to, &amount);
+    }
+
     #[test]
     fn test_initialize() {
         let (_env, admin, client, _) = setup_env();
@@ -642,8 +647,11 @@ mod tests {
 
     #[test]
     fn test_deposit_and_withdraw() {
-        let (env, _admin, client, _) = setup_env();
+        let (env, _admin, client, native_token) = setup_env();
         let user = Address::generate(&env);
+
+        // Give the user enough native tokens to deposit
+        mint(&env, &native_token, &user, 2_000_000_i128);
 
         // Deposit
         let balance_after_deposit = client.deposit(&user, &1_000_000_i128);
@@ -663,9 +671,13 @@ mod tests {
 
     #[test]
     fn test_vault_stats_staker_count() {
-        let (env, _admin, client, _) = setup_env();
+        let (env, _admin, client, native_token) = setup_env();
         let user1 = Address::generate(&env);
         let user2 = Address::generate(&env);
+
+        // Give users native tokens before depositing
+        mint(&env, &native_token, &user1, 1_000_000_i128);
+        mint(&env, &native_token, &user2, 1_000_000_i128);
 
         client.deposit(&user1, &500_000_i128);
         client.deposit(&user2, &300_000_i128);
@@ -677,9 +689,14 @@ mod tests {
 
     #[test]
     fn test_governance_proposal_and_vote() {
-        let (env, admin, client, native_token) = setup_env();
+        let (env, _admin, client, native_token) = setup_env();
         let proposer = Address::generate(&env);
         let voter = Address::generate(&env);
+
+        // Mint native tokens BEFORE depositing (deposit now does a real transfer)
+        // Also mint extra for vote fees (10_000_000 stroops = 1 XLM per vote)
+        mint(&env, &native_token, &proposer, 200_000_000_i128);
+        mint(&env, &native_token, &voter,    200_000_000_i128);
 
         // Need stake to propose/vote
         client.deposit(&proposer, &1_000_000_i128);
@@ -689,11 +706,6 @@ mod tests {
         let desc = String::from_str(&env, "Proposal to increase reward rate from 10 to 20 bps");
         let proposal_id = client.create_proposal(&proposer, &title, &desc);
         assert_eq!(proposal_id, 1);
-
-        // Mint native tokens to voters for the fee
-        let token_admin_client = token::StellarAssetClient::new(&env, &native_token);
-        token_admin_client.mint(&voter, &100_000_000);
-        token_admin_client.mint(&proposer, &100_000_000);
 
         client.vote(&voter, &1u64, &true);
         client.vote(&proposer, &1u64, &false);
@@ -717,8 +729,9 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_cannot_withdraw_more_than_balance() {
-        let (env, _admin, client, _) = setup_env();
+        let (env, _admin, client, native_token) = setup_env();
         let user = Address::generate(&env);
+        mint(&env, &native_token, &user, 1_000_000_i128);
         client.deposit(&user, &100_000_i128);
         client.withdraw(&user, &999_999_i128);
     }
