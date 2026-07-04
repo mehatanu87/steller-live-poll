@@ -152,6 +152,15 @@ jobs:
             --source deployer \
             --network testnet \
             -- \
+            deposit \
+            --user $(stellar keys address deployer) \
+            --amount 10000000
+
+          stellar contract invoke \
+            --id $CONTRACT_ID \
+            --source deployer \
+            --network testnet \
+            -- \
             create_proposal \
             --proposer $(stellar keys address deployer) \
             --title "Increase Reward Rate to 15 bps" \
