@@ -142,19 +142,115 @@ export async function vote(proposalId: number, voteFor: boolean, userAddress: st
 }
 
 export async function deposit(amount: bigint, userAddress: string): Promise<string> {
-  throw new Error("Deposit not yet implemented for real wallet integration.");
+  const account = await rpcServer.getAccount(userAddress);
+  const contract = new Contract(CONTRACT_ID);
+  const tx = new TransactionBuilder(account, { fee: "1000", networkPassphrase: NETWORK.networkPassphrase })
+    .addOperation(
+      contract.call("deposit",
+        new Address(userAddress).toScVal(),
+        nativeToScVal(amount, { type: 'i128' })
+      )
+    )
+    .setTimeout(60)
+    .build();
+
+  const preparedTx = await rpcServer.prepareTransaction(tx);
+  const signRes = await signTransaction(preparedTx.toXDR(), { networkPassphrase: NETWORK.networkPassphrase });
+  if (signRes.error) throw new Error(signRes.error);
+  
+  const signedTx = TransactionBuilder.fromXDR(signRes.signedTxXdr, NETWORK.networkPassphrase);
+  
+  const sendRes = await rpcServer.sendTransaction(signedTx as any);
+  if (sendRes.status === "ERROR") throw new Error("Transaction failed to submit");
+  
+  return sendRes.hash;
 }
 
 export async function withdraw(amount: bigint, userAddress: string): Promise<string> {
-  throw new Error("Withdraw not yet implemented for real wallet integration.");
+  const account = await rpcServer.getAccount(userAddress);
+  const contract = new Contract(CONTRACT_ID);
+  const tx = new TransactionBuilder(account, { fee: "1000", networkPassphrase: NETWORK.networkPassphrase })
+    .addOperation(
+      contract.call("withdraw",
+        new Address(userAddress).toScVal(),
+        nativeToScVal(amount, { type: 'i128' })
+      )
+    )
+    .setTimeout(60)
+    .build();
+
+  const preparedTx = await rpcServer.prepareTransaction(tx);
+  const signRes = await signTransaction(preparedTx.toXDR(), { networkPassphrase: NETWORK.networkPassphrase });
+  if (signRes.error) throw new Error(signRes.error);
+  
+  const signedTx = TransactionBuilder.fromXDR(signRes.signedTxXdr, NETWORK.networkPassphrase);
+  
+  const sendRes = await rpcServer.sendTransaction(signedTx as any);
+  if (sendRes.status === "ERROR") throw new Error("Transaction failed to submit");
+  
+  return sendRes.hash;
 }
 
 export async function claimRewards(userAddress: string): Promise<{ hash: string; amount: bigint }> {
-  throw new Error("Claim not yet implemented for real wallet integration.");
+  const account = await rpcServer.getAccount(userAddress);
+  const contract = new Contract(CONTRACT_ID);
+  const tx = new TransactionBuilder(account, { fee: "1000", networkPassphrase: NETWORK.networkPassphrase })
+    .addOperation(
+      contract.call("claim_rewards",
+        new Address(userAddress).toScVal()
+      )
+    )
+    .setTimeout(60)
+    .build();
+
+  const preparedTx = await rpcServer.prepareTransaction(tx);
+  const signRes = await signTransaction(preparedTx.toXDR(), { networkPassphrase: NETWORK.networkPassphrase });
+  if (signRes.error) throw new Error(signRes.error);
+  
+  const signedTx = TransactionBuilder.fromXDR(signRes.signedTxXdr, NETWORK.networkPassphrase);
+  
+  const sendRes = await rpcServer.sendTransaction(signedTx as any);
+  if (sendRes.status === "ERROR") throw new Error("Transaction failed to submit");
+  
+  return { hash: sendRes.hash, amount: 0n };
 }
 
 export async function createProposal(title: string, description: string, address: string): Promise<number> {
-  throw new Error("Create Proposal not yet implemented for real wallet integration.");
+  const account = await rpcServer.getAccount(address);
+  const contract = new Contract(CONTRACT_ID);
+  const tx = new TransactionBuilder(account, { fee: "1000", networkPassphrase: NETWORK.networkPassphrase })
+    .addOperation(
+      contract.call("create_proposal",
+        new Address(address).toScVal(),
+        nativeToScVal(title, { type: 'string' }),
+        nativeToScVal(description, { type: 'string' })
+      )
+    )
+    .setTimeout(60)
+    .build();
+
+  const preparedTx = await rpcServer.prepareTransaction(tx);
+  const signRes = await signTransaction(preparedTx.toXDR(), { networkPassphrase: NETWORK.networkPassphrase });
+  if (signRes.error) throw new Error(signRes.error);
+  
+  const signedTx = TransactionBuilder.fromXDR(signRes.signedTxXdr, NETWORK.networkPassphrase);
+  
+  const sendRes = await rpcServer.sendTransaction(signedTx as any);
+  if (sendRes.status === "ERROR") throw new Error("Transaction failed to submit");
+  
+  // Create a mock local proposal since we don't dynamically read yet
+  const nextId = _proposals.length + 1;
+  _proposals.push({
+    id: nextId,
+    title,
+    description,
+    proposer: address,
+    votesFor: 0,
+    votesAgainst: 0,
+    active: true,
+  });
+  
+  return nextId;
 }
 
 // ─── Formatting helpers ───────────────────────────────────────────────────────
