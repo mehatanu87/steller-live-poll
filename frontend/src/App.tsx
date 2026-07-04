@@ -17,6 +17,7 @@ export default function App() {
       <Header
         connected={vault.connected}
         address={vault.address}
+        balance={vault.position?.walletBalance}
         loading={vault.loading}
         onConnect={vault.connect}
         onDisconnect={vault.disconnect}

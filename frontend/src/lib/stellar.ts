@@ -9,8 +9,10 @@ import {
   Networks,
   Address,
   nativeToScVal,
+  scValToNative,
   xdr,
   Contract,
+  Account,
 } from "@stellar/stellar-sdk";
 
 export const NETWORK = {
@@ -50,38 +52,71 @@ export interface Proposal {
 
 export interface UserPosition {
   balance: bigint;
+  walletBalance: bigint;
   pendingRewards: bigint;
   hasVoted: Record<number, boolean>;
 }
-
-// Keep stats and proposals mocked for demo UI, but we fetch REAL balance and submit REAL txs
-let _stats: VaultStats = {
-  totalDeposited: BigInt(2_847_000_000),
-  totalWithdrawn:  BigInt(318_000_000),
-  totalStakers: 142,
-  vaultOpen: true,
-  rewardRate: 10,
-};
-
-let _proposals: Proposal[] = [
-  {
-    id: 1,
-    title: 'Increase Reward Rate to 15 bps',
-    description: 'Proposal to boost staking incentives by raising the per-block reward rate from 10 to 15 basis points.',
-    proposer: 'GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPGQS7Z5QUEUELA7HHBSB77M4',
-    votesFor: 87,
-    votesAgainst: 23,
-    active: true,
-    createdAt: Date.now() - 86_400_000,
+// Helper to simulate read queries without needing a real user sequence
+async function simulateQuery(method: string, args: xdr.ScVal[] = [], sourceAccount = 'GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPGQS7Z5QUEUELA7HHBSB77M4') {
+  try {
+    const account = new Account(sourceAccount, "0");
+    const contract = new Contract(CONTRACT_ID);
+    const tx = new TransactionBuilder(account, { fee: "100", networkPassphrase: NETWORK.networkPassphrase })
+      .addOperation(contract.call(method, ...args))
+      .setTimeout(30).build();
+    const sim = await rpcServer.simulateTransaction(tx);
+    if (SorobanRpc.Api.isSimulationSuccess(sim)) {
+      return scValToNative(sim.result.retval);
+    }
+  } catch (e) {
+    console.warn(`Query failed for ${method}`, e);
   }
-];
+  return null;
+}
 
 export async function fetchVaultStats(): Promise<VaultStats> {
-  return _stats;
+  const stats = await simulateQuery("get_vault_stats");
+  if (stats) {
+    return {
+      totalDeposited: stats.total_deposited,
+      totalWithdrawn: stats.total_withdrawn,
+      totalStakers: stats.total_stakers,
+      vaultOpen: stats.vault_open,
+      rewardRate: stats.reward_rate,
+    };
+  }
+  // Fallback to zeros if contract not readable yet
+  return {
+    totalDeposited: 0n,
+    totalWithdrawn: 0n,
+    totalStakers: 0,
+    vaultOpen: true,
+    rewardRate: 10,
+  };
 }
 
 export async function fetchProposals(): Promise<Proposal[]> {
-  return _proposals;
+  const countRes = await simulateQuery("get_proposal_count");
+  if (!countRes) return [];
+  
+  const count = Number(countRes);
+  const props: Proposal[] = [];
+  for (let i = 1; i <= count; i++) {
+    const p = await simulateQuery("get_proposal", [nativeToScVal(i, { type: 'u64' })]);
+    if (p) {
+      props.push({
+        id: Number(p.id),
+        title: p.title,
+        description: p.description,
+        proposer: p.proposer,
+        votesFor: Number(p.votes_for),
+        votesAgainst: Number(p.votes_against),
+        active: p.active,
+        createdAt: Number(p.created_at) * 1000,
+      });
+    }
+  }
+  return props.sort((a,b) => b.id - a.id);
 }
 
 export async function connectWallet(): Promise<string> {
@@ -94,19 +129,35 @@ export async function connectWallet(): Promise<string> {
 }
 
 export async function fetchUserPosition(address: string): Promise<UserPosition> {
+  let walletBalance = 0n;
   try {
     const res = await fetch(`${NETWORK.horizonUrl}/accounts/${address}`);
-    if (!res.ok) return { balance: 0n, pendingRewards: 0n, hasVoted: {} };
-    const data = await res.json();
-    const nativeBal = data.balances.find((b: any) => b.asset_type === "native");
-    return {
-      balance: nativeBal ? xlmToStroops(parseFloat(nativeBal.balance)) : 0n,
-      pendingRewards: 0n,
-      hasVoted: {},
-    };
+    if (res.ok) {
+      const data = await res.json();
+      const nativeBal = data.balances.find((b: any) => b.asset_type === "native");
+      if (nativeBal) {
+        walletBalance = xlmToStroops(parseFloat(nativeBal.balance));
+      }
+    }
   } catch (e) {
-    return { balance: 0n, pendingRewards: 0n, hasVoted: {} };
+    console.warn("Horizon fetch failed", e);
   }
+
+  let stakedBalance = 0n;
+  let pendingRewards = 0n;
+
+  const balRes = await simulateQuery("get_balance", [new Address(address).toScVal()], address);
+  if (balRes !== null) stakedBalance = balRes;
+
+  const rewRes = await simulateQuery("get_pending_rewards", [new Address(address).toScVal()], address);
+  if (rewRes !== null) pendingRewards = rewRes;
+
+  return {
+    balance: stakedBalance,
+    walletBalance,
+    pendingRewards,
+    hasVoted: {}, // To fetch if needed
+  };
 }
 
 export async function vote(proposalId: number, voteFor: boolean, userAddress: string): Promise<string> {
@@ -131,12 +182,6 @@ export async function vote(proposalId: number, voteFor: boolean, userAddress: st
   
   const sendRes = await rpcServer.sendTransaction(signedTx as any);
   if (sendRes.status === "ERROR") throw new Error("Transaction failed to submit");
-  
-  const p = _proposals.find(p => p.id === proposalId);
-  if (p) {
-    if (voteFor) p.votesFor += 1;
-    else p.votesAgainst += 1;
-  }
   
   return sendRes.hash;
 }
@@ -238,20 +283,7 @@ export async function createProposal(title: string, description: string, address
   const sendRes = await rpcServer.sendTransaction(signedTx as any);
   if (sendRes.status === "ERROR") throw new Error("Transaction failed to submit");
   
-  // Create a mock local proposal since we don't dynamically read yet
-  const nextId = _proposals.length + 1;
-  _proposals.push({
-    id: nextId,
-    title,
-    description,
-    proposer: address,
-    votesFor: 0,
-    votesAgainst: 0,
-    active: true,
-    createdAt: Date.now(),
-  });
-  
-  return nextId;
+  return 0; // Returning 0 since we'll refetch proposals anyway
 }
 
 // ─── Formatting helpers ───────────────────────────────────────────────────────

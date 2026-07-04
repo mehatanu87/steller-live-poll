@@ -5,3 +5,6 @@ dist/
 *.wasm
 .DS_Store
 coverage/
+
+.vercel
+.env*
